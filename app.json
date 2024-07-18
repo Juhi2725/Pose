@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "pose-detection-expo",
+    "slug": "pose-detection-expo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "web": {
+      "build": {
+        "babel": {
+          "include": [
+            "@tensorflow/tfjs-react-native"
+          ]
+        }
+      }
+    }
+  }
+}
