@@ -1,0 +1,41 @@
+.App {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #f0f0f0;
+    position: relative; /* Added to allow absolute positioning of children */
+  }
+  
+  .webcam {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    transform: scaleX(-1);
+  }
+  
+  .canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none; /* Ensures canvas doesn't interfere with webcam interaction */
+    transform: scaleX(-1);
+  
+  }
+  
+  .log-container {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    height: 150px;
+    overflow-y: auto;
+    background: rgba(255, 0, 0, 0.7); /* Red background */
+    color: black;
+    font-size: 12px;
+    padding: 5px;
+    box-sizing: border-box;
+    z-index: 10; /* Ensure log container is on top */
+  }
+  
