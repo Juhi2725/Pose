@@ -12,8 +12,10 @@ const App = () => {
   const [logs, setLogs] = useState([]);
   const [capturedImage, setCapturedImage] = useState(null);
   const [frameCaptured, setFrameCaptured] = useState(false); // Flag to ensure only one frame capture
+  const [faceDetected, setFaceDetected] = useState(false); // Flag to track if face is detected
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
+  const [ctxTest, setCtxTest] = useState(null);
 
   const setupCamera = async () => {
     try {
@@ -86,6 +88,24 @@ const App = () => {
     img.src = imageSrc;
   }, [webcamRef]);
 
+  const drawStaticFrame = (ctx, canvas) => {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radiusX = canvas.width * 0.37; // Adjusted for a smaller oval
+    const radiusY = canvas.height * 0.3; // Adjusted for a smaller oval
+
+    // Clear the canvas before drawing
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the oval frame
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+    ctx.lineWidth = 4; // Increased width of the oval frame
+    setLogs((prevLogs) => ['faceDetected: ' + faceDetected]);
+    ctx.strokeStyle = faceDetected ? 'green' : 'red'; // Change color based on face detection
+    ctx.stroke();
+  };
+
   const detectFace = async (model, video) => {
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
       return;
@@ -97,9 +117,6 @@ const App = () => {
     // Set canvas size to match video dimensions
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
-    // Clear the canvas before drawing
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Estimate faces in the video frame
     const predictions = await model.estimateFaces(video);
@@ -120,16 +137,9 @@ const App = () => {
       // Adjust for mirroring
       const videoScaleX = webcamRef.current.video.style.transform === 'scaleX(-1)' ? -1 : 1;
 
-      // Log bounding box details
-      setLogs((prevLogs) => [
-        ...prevLogs,
-        `Bounding box: xMin (${xMin}), yMin (${yMin}), width (${width}), height (${height})`
-      ]);
-
-      // Calculate the center and radius for the round face
+      // Calculate the center of the face
       const centerX = xMin + width / 2;
       const centerY = yMin + height / 2;
-      const radius = Math.min(width, height) / 2;
 
       // Define the middle region of the canvas (e.g., the central 50% area)
       const middleRegion = {
@@ -144,32 +154,28 @@ const App = () => {
           centerX * videoScaleX <= middleRegion.xMax &&
           centerY >= middleRegion.yMin &&
           centerY <= middleRegion.yMax) {
-        // Draw a circle around the detected face
-        ctx.beginPath();
-        ctx.arc(centerX * videoScaleX, centerY, radius, 0, 2 * Math.PI);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'red';
-        ctx.stroke();
+        setFaceDetected(true);
 
         if (!frameCaptured) {
-          setFrameCaptured(true); // Set the flag to true after capturing the frame
+          setFrameCaptured(true); // Set the flag to true after detecting the face
           // Capture the image from the webcam after 3 seconds
           setTimeout(() => {
             capture();
             setLogs((prevLogs) => [...prevLogs, 'Image captured after 3 seconds.']);
-          }, 3000);
+          }, 1000);
         }
       } else {
-        // Log if face is not in the middle region
-        setLogs((prevLogs) => [...prevLogs, 'Face not in the middle region.']);
+        setFaceDetected(false);
       }
     } else {
-      // Log if no face is detected
-      setLogs((prevLogs) => [...prevLogs, 'No face detected.']);
+      setFaceDetected(false);
     }
 
+    // Draw the static frame with the updated color
+    drawStaticFrame(ctx, canvas);
+
     // Request the next animation frame for continuous detection
-    setTimeout(() => requestAnimationFrame(() => detectFace(model, video)), 100);
+    requestAnimationFrame(() => detectFace(model, video));
   };
 
   useEffect(() => {
