@@ -2,7 +2,7 @@ import '@mediapipe/face_detection';
 import '@tensorflow/tfjs-core';
 import '@tensorflow/tfjs-backend-webgl';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import * as tf from '@tensorflow/tfjs';
 import * as faceDetection from '@tensorflow-models/face-detection';
@@ -10,6 +10,8 @@ import './App.css';
 
 const App = () => {
   const [logs, setLogs] = useState([]);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [frameCaptured, setFrameCaptured] = useState(false); // Flag to ensure only one frame capture
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -28,7 +30,6 @@ const App = () => {
       });
     } catch (error) {
       console.error('Error accessing webcam: ', error);
-      alert('Unable to access webcam. Please check your permissions and try again.');
       throw error;
     }
   };
@@ -37,23 +38,10 @@ const App = () => {
     try {
       await tf.ready();
 
-      // Ensure that the correct model is being used
-      // const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
-
-      // // Verify the supported runtimes
-      // const detectorConfig = {
-      //   runtime: 'tfjs', // or 'mediapipe'
-      //   //source: 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core'
-      // };
-
-      // // Create detector
-      // const detector = await faceDetection.createDetector(model, detectorConfig);
-
       const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
       const detectorConfig = {
         runtime: 'mediapipe',
         solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection',
-        // or 'base/node_modules/@mediapipe/face_detection' in npm.
       };
       const detector = await faceDetection.createDetector(model, detectorConfig);
 
@@ -73,6 +61,30 @@ const App = () => {
       throw error;
     }
   };
+
+  const capture = useCallback(() => {
+    const imageSrc = webcamRef.current.getScreenshot();
+
+    // Create a canvas to flip the image
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Flip the image horizontally
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0);
+
+      const flippedImageSrc = canvas.toDataURL('image/png');
+      setCapturedImage(flippedImageSrc);
+    };
+
+    img.src = imageSrc;
+  }, [webcamRef]);
 
   const detectFace = async (model, video) => {
     if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
@@ -114,12 +126,43 @@ const App = () => {
         `Bounding box: xMin (${xMin}), yMin (${yMin}), width (${width}), height (${height})`
       ]);
 
-      // Draw bounding box on canvas
-      ctx.beginPath();
-      ctx.rect(xMin * videoScaleX, yMin, width * videoScaleX, height);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'red';
-      ctx.stroke();
+      // Calculate the center and radius for the round face
+      const centerX = xMin + width / 2;
+      const centerY = yMin + height / 2;
+      const radius = Math.min(width, height) / 2;
+
+      // Define the middle region of the canvas (e.g., the central 50% area)
+      const middleRegion = {
+        xMin: canvas.width * 0.25,
+        xMax: canvas.width * 0.75,
+        yMin: canvas.height * 0.25,
+        yMax: canvas.height * 0.75,
+      };
+
+      // Check if the face is in the middle region
+      if (centerX * videoScaleX >= middleRegion.xMin &&
+          centerX * videoScaleX <= middleRegion.xMax &&
+          centerY >= middleRegion.yMin &&
+          centerY <= middleRegion.yMax) {
+        // Draw a circle around the detected face
+        ctx.beginPath();
+        ctx.arc(centerX * videoScaleX, centerY, radius, 0, 2 * Math.PI);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'red';
+        ctx.stroke();
+
+        if (!frameCaptured) {
+          setFrameCaptured(true); // Set the flag to true after capturing the frame
+          // Capture the image from the webcam after 3 seconds
+          setTimeout(() => {
+            capture();
+            setLogs((prevLogs) => [...prevLogs, 'Image captured after 3 seconds.']);
+          }, 3000);
+        }
+      } else {
+        // Log if face is not in the middle region
+        setLogs((prevLogs) => [...prevLogs, 'Face not in the middle region.']);
+      }
     } else {
       // Log if no face is detected
       setLogs((prevLogs) => [...prevLogs, 'No face detected.']);
@@ -147,22 +190,30 @@ const App = () => {
 
   return (
     <div className="App">
-      <Webcam
-        ref={webcamRef}
-        className="webcam"
-        videoConstraints={{
-          facingMode: 'user', // Use 'environment' for the back camera
-        }}
-      />
-      <canvas
-        ref={canvasRef}
-        className="canvas"
-      ></canvas>
-      <div className="log-container">
-        {logs.map((log, index) => (
-          <div key={index}>{log}</div>
-        ))}
-      </div>
+      {
+        capturedImage ? (
+          <img src={capturedImage} alt="Captured" />
+        ) :  
+        <>
+          <Webcam
+            ref={webcamRef}
+            className="webcam"
+            screenshotFormat="image/png"
+            videoConstraints={{
+              facingMode: 'user', // Use 'environment' for the back camera
+            }}
+          />
+          <canvas
+            ref={canvasRef}
+            className="canvas"
+          ></canvas>
+          <div className="log-container">
+            {logs.map((log, index) => (
+              <div key={index}>{log}</div>
+            ))}
+          </div>
+        </>
+      }
     </div>
   );
 };
