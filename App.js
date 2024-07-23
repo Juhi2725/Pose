@@ -8,7 +8,7 @@ import * as tf from "@tensorflow/tfjs";
 import * as faceDetection from "@tensorflow-models/face-detection";
 import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import "./App.css";
-import { Image } from "react-native";
+import { Image, Text, View } from "react-native";
 import { filterByType } from "./helper";
 
 const App = () => {
@@ -19,6 +19,9 @@ const App = () => {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
   const [ctxTest, setCtxTest] = useState(null);
+  const [userInFrame, setUserInFrame] = useState(false);
+
+  const [timeLeft, setTimeLeft] = useState(null);
 
   const setupCamera = async () => {
     try {
@@ -77,8 +80,10 @@ const App = () => {
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current.getScreenshot();
+    setCapturedImage(imageSrc);
 
     // Create a canvas to flip the image
+    /*
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const img = new Image();
@@ -95,8 +100,8 @@ const App = () => {
       const flippedImageSrc = canvas.toDataURL("image/png");
       setCapturedImage(flippedImageSrc);
     };
-
-    img.src = imageSrc;
+*/
+    //img.src = imageSrc;
   }, [webcamRef]);
 
   const drawStaticFrame = (ctx, canvas, prediction) => {
@@ -107,16 +112,6 @@ const App = () => {
 
     // Clear the canvas before drawing
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw the oval frame
-    /*
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
-    ctx.lineWidth = 4; // Increased width of the oval frame
-    setLogs((prevLogs) => ["faceDetected: " + faceDetected]);
-    ctx.strokeStyle = faceDetected ? "green" : "red"; // Change color based on face detection
-    ctx.stroke();
-    */
 
     const region = new Path2D();
     const points = prediction.keypoints;
@@ -204,31 +199,39 @@ const App = () => {
     //console.log("left = ", diffLeft, " right = ", diffRight);
     if (diffLeft / height < 0.035 && diffRight / height < 0.035) {
       console.log("YOU JUST BLINKED");
-      console.log("height === ", diffLeft / height);
+      if (!frameCaptured) {
+        //console.log("capturing");
+        setFrameCaptured(true); // Set the flag to true after detecting the face
+      }
     }
   };
 
-  const detectFace = async (model, video) => {
-    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
-      return;
+  useEffect(() => {
+    console.log("should capture");
+    if (frameCaptured) {
+      setTimeout(() => {
+        setTimeLeft(3);
+      }, 1000);
     }
+  }, [frameCaptured]);
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+  useEffect(() => {
+    console.log("should capture");
+    if (timeLeft > 0) {
+      setTimeout(() => {
+        setTimeLeft(timeLeft - 1);
+      }, 1000);
+    } else {
+      capture();
+    }
+  }, [timeLeft]);
 
-    // Set canvas size to match video dimensions
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Estimate faces in the video frame
-    const predictions = await model.estimateFaces(video);
-
+  const checkPredictions = (predictions, canvas) => {
     if (predictions.length > 0) {
       // Process only the first detected face
       const prediction = predictions[0];
       //drawStaticFrame(ctx, canvas, prediction);
       //drawLeftEye(ctx, canvas, prediction);
-      checkForBlink(prediction);
 
       // Log face detection information
       setLogs((prevLogs) => [...prevLogs, `Face detected: true`]);
@@ -254,10 +257,10 @@ const App = () => {
       };
 
       const sizeConstraints = {
-        widthMin: canvas.width / 4.5,
-        widthMax: canvas.width / 3,
-        heightMin: canvas.height / 3.5,
-        heightMax: canvas.height / 2.5,
+        widthMin: canvas.width / 5,
+        widthMax: canvas.width / 2.5,
+        heightMin: canvas.height / 4,
+        heightMax: canvas.height / 2,
       };
 
       // Check if the face is in the middle region
@@ -272,18 +275,7 @@ const App = () => {
         width >= sizeConstraints.heightMin
       ) {
         setFaceDetected(true);
-
-        if (!frameCaptured) {
-          setFrameCaptured(true); // Set the flag to true after detecting the face
-          // Capture the image from the webcam after 3 seconds
-          setTimeout(() => {
-            //capture();
-            setLogs((prevLogs) => [
-              ...prevLogs,
-              "Image captured after 3 seconds.",
-            ]);
-          }, 3000);
-        }
+        checkForBlink(prediction);
       } else {
         setFaceDetected(false);
       }
@@ -292,6 +284,24 @@ const App = () => {
       setLogs((prevLogs) => [...prevLogs, `Face detected: false`]);
       console.log("no face detected");
     }
+  };
+
+  const detectFace = async (model, video) => {
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    // Set canvas size to match video dimensions
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Estimate faces in the video frame
+    const predictions = await model.estimateFaces(video);
+
+    checkPredictions(predictions, canvas);
 
     // Draw the static frame with the updated color
 
@@ -342,7 +352,22 @@ const App = () => {
             }}
             resizeMode="center"
           ></Image>
+
           <canvas ref={canvasRef} className="canvas"></canvas>
+          {timeLeft != null && (
+            <View style={{ flex: 1, position: "absolute" }}>
+              <Text
+                style={{
+                  fontSize: 64,
+                  width: "100%",
+                  textAlign: "center",
+                  color: "white",
+                }}
+              >
+                {timeLeft}
+              </Text>
+            </View>
+          )}
         </>
       )}
     </div>
