@@ -6,8 +6,10 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import Webcam from "react-webcam";
 import * as tf from "@tensorflow/tfjs";
 import * as faceDetection from "@tensorflow-models/face-detection";
+import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import "./App.css";
 import { Image } from "react-native";
+import { filterByType } from "./helper";
 
 const App = () => {
   const [logs, setLogs] = useState([]);
@@ -41,12 +43,12 @@ const App = () => {
     try {
       await tf.ready();
 
-      const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
+      const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
       const detectorConfig = {
         runtime: "mediapipe",
-        solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_detection",
+        solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh",
       };
-      const detector = await faceDetection.createDetector(
+      const detector = await faceLandmarksDetection.createDetector(
         model,
         detectorConfig
       );
@@ -97,22 +99,113 @@ const App = () => {
     img.src = imageSrc;
   }, [webcamRef]);
 
-  const drawStaticFrame = (ctx, canvas) => {
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radiusX = canvas.width * 0.37; // Adjusted for a smaller oval
-    const radiusY = canvas.height * 0.3; // Adjusted for a smaller oval
+  const drawStaticFrame = (ctx, canvas, prediction) => {
+    const centerX = prediction.box.xMin + prediction.box.width / 2;
+    const centerY = prediction.box.yMin + prediction.box.height / 2;
+    const radiusX = prediction.box.width / 2; // Adjusted for a smaller oval
+    const radiusY = prediction.box.height / 3; // Adjusted for a smaller oval
 
     // Clear the canvas before drawing
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw the oval frame
+    /*
     ctx.beginPath();
     ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
     ctx.lineWidth = 4; // Increased width of the oval frame
     setLogs((prevLogs) => ["faceDetected: " + faceDetected]);
     ctx.strokeStyle = faceDetected ? "green" : "red"; // Change color based on face detection
     ctx.stroke();
+    */
+
+    const region = new Path2D();
+    const points = prediction.keypoints;
+    var upperPoint = 0;
+    var lowerPoint = 1000;
+    for (let i = 0; i < points.length; i++) {
+      const point = points[i];
+
+      if (point.name === "rightEye") {
+        region.lineTo(point.x, point.y);
+        if (point.y > upperPoint) {
+          upperPoint = point.y;
+        }
+        if (point.y < lowerPoint) {
+          lowerPoint = point.y;
+        }
+      }
+    }
+
+    //if (closePath) {
+    region.closePath();
+    //}
+    ctx.lineWidth = 1; // Increased width of the oval frame
+    ctx.strokeStyle = faceDetected ? "green" : "red"; // Change color based on face detection
+
+    ctx.stroke(region);
+  };
+
+  const drawLeftEye = (ctx, canvas, prediction) => {
+    // Clear the canvas before drawing
+
+    const region = new Path2D();
+    const points = prediction.keypoints;
+    for (let i = 0; i < points.length; i++) {
+      const point = points[i];
+      if (point.name === "leftEye") {
+        region.lineTo(point.x, point.y);
+        // console.log("point x", point.x);
+      }
+    }
+
+    //if (closePath) {
+    region.closePath();
+    //}
+    ctx.lineWidth = 1; // Increased width of the oval frame
+    ctx.strokeStyle = faceDetected ? "green" : "red"; // Change color based on face detection
+
+    ctx.stroke(region);
+  };
+
+  const checkForBlink = (prediction) => {
+    const points = prediction.keypoints;
+    var upperPointRight = 0;
+    var lowerPointRight = 1000;
+
+    var upperPointLeft = 0;
+    var lowerPointLeft = 1000;
+    const rightEyePoints = filterByType("rightEye", points);
+    const leftEyePoints = filterByType("leftEye", points);
+
+    for (let i = 0; i < rightEyePoints.length; i++) {
+      const point = rightEyePoints[i];
+      if (point.y > upperPointRight) {
+        upperPointRight = point.y;
+      }
+      if (point.y < lowerPointRight) {
+        lowerPointRight = point.y;
+      }
+    }
+
+    for (let i = 0; i < leftEyePoints.length; i++) {
+      const point = leftEyePoints[i];
+      if (point.y > upperPointLeft) {
+        upperPointLeft = point.y;
+      }
+      if (point.y < lowerPointLeft) {
+        lowerPointLeft = point.y;
+      }
+    }
+
+    const { xMin, yMin, width, height } = prediction.box;
+    const diffRight = upperPointRight - lowerPointRight;
+    const diffLeft = upperPointLeft - lowerPointLeft;
+
+    //console.log("left = ", diffLeft, " right = ", diffRight);
+    if (diffLeft / height < 0.035 && diffRight / height < 0.035) {
+      console.log("YOU JUST BLINKED");
+      console.log("height === ", diffLeft / height);
+    }
   };
 
   const detectFace = async (model, video) => {
@@ -133,10 +226,13 @@ const App = () => {
     if (predictions.length > 0) {
       // Process only the first detected face
       const prediction = predictions[0];
+      //drawStaticFrame(ctx, canvas, prediction);
+      //drawLeftEye(ctx, canvas, prediction);
+      checkForBlink(prediction);
 
       // Log face detection information
       setLogs((prevLogs) => [...prevLogs, `Face detected: true`]);
-      console.log(`Face detected: (true)`, JSON.stringify(prediction));
+      //console.log(`eye`, JSON.stringify(prediction.box));
 
       // Bounding box coordinates
       const { xMin, yMin, width, height } = prediction.box;
@@ -163,7 +259,6 @@ const App = () => {
         heightMin: canvas.height / 3.5,
         heightMax: canvas.height / 2.5,
       };
-      console.log(JSON.stringify(sizeConstraints));
 
       // Check if the face is in the middle region
       if (
@@ -199,7 +294,6 @@ const App = () => {
     }
 
     // Draw the static frame with the updated color
-    //drawStaticFrame(ctx, canvas);
 
     // Request the next animation frame for continuous detection
     requestAnimationFrame(() => detectFace(model, video));
