@@ -1,12 +1,13 @@
-import '@mediapipe/face_detection';
-import '@tensorflow/tfjs-core';
-import '@tensorflow/tfjs-backend-webgl';
+import "@mediapipe/face_detection";
+import "@tensorflow/tfjs-core";
+import "@tensorflow/tfjs-backend-webgl";
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import Webcam from 'react-webcam';
-import * as tf from '@tensorflow/tfjs';
-import * as faceDetection from '@tensorflow-models/face-detection';
-import './App.css';
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import Webcam from "react-webcam";
+import * as tf from "@tensorflow/tfjs";
+import * as faceDetection from "@tensorflow-models/face-detection";
+import "./App.css";
+import { Image } from "react-native";
 
 const App = () => {
   const [logs, setLogs] = useState([]);
@@ -21,7 +22,7 @@ const App = () => {
     try {
       const video = webcamRef.current.video;
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' }, // Use 'environment' for the back camera
+        video: { facingMode: "user" }, // Use 'environment' for the back camera
       });
       video.srcObject = stream;
 
@@ -31,7 +32,7 @@ const App = () => {
         };
       });
     } catch (error) {
-      console.error('Error accessing webcam: ', error);
+      console.error("Error accessing webcam: ", error);
       throw error;
     }
   };
@@ -42,24 +43,32 @@ const App = () => {
 
       const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
       const detectorConfig = {
-        runtime: 'mediapipe',
-        solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection',
+        runtime: "mediapipe",
+        solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_detection",
       };
-      const detector = await faceDetection.createDetector(model, detectorConfig);
+      const detector = await faceDetection.createDetector(
+        model,
+        detectorConfig
+      );
 
       // Log model details
-      console.log('Model loaded:', detector);
+      console.log("Model loaded:", detector);
       setLogs((prevLogs) => [
         ...prevLogs,
-        'Model loaded successfully.',
+        "Model loaded successfully.",
         `Model Type: ${detector.constructor.name}`,
-        `Model Methods: ${Object.getOwnPropertyNames(Object.getPrototypeOf(detector)).join(', ')}`
+        `Model Methods: ${Object.getOwnPropertyNames(
+          Object.getPrototypeOf(detector)
+        ).join(", ")}`,
       ]);
 
       return detector;
     } catch (error) {
-      console.error('Error loading model:', error);
-      setLogs((prevLogs) => [...prevLogs, 'Error loading model: ' + error.message]);
+      console.error("Error loading model:", error);
+      setLogs((prevLogs) => [
+        ...prevLogs,
+        "Error loading model: " + error.message,
+      ]);
       throw error;
     }
   };
@@ -68,8 +77,8 @@ const App = () => {
     const imageSrc = webcamRef.current.getScreenshot();
 
     // Create a canvas to flip the image
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
     const img = new Image();
 
     img.onload = () => {
@@ -81,7 +90,7 @@ const App = () => {
       ctx.scale(-1, 1);
       ctx.drawImage(img, 0, 0);
 
-      const flippedImageSrc = canvas.toDataURL('image/png');
+      const flippedImageSrc = canvas.toDataURL("image/png");
       setCapturedImage(flippedImageSrc);
     };
 
@@ -101,8 +110,8 @@ const App = () => {
     ctx.beginPath();
     ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
     ctx.lineWidth = 4; // Increased width of the oval frame
-    setLogs((prevLogs) => ['faceDetected: ' + faceDetected]);
-    ctx.strokeStyle = faceDetected ? 'green' : 'red'; // Change color based on face detection
+    setLogs((prevLogs) => ["faceDetected: " + faceDetected]);
+    ctx.strokeStyle = faceDetected ? "green" : "red"; // Change color based on face detection
     ctx.stroke();
   };
 
@@ -112,7 +121,7 @@ const App = () => {
     }
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
 
     // Set canvas size to match video dimensions
     canvas.width = video.videoWidth;
@@ -126,16 +135,15 @@ const App = () => {
       const prediction = predictions[0];
 
       // Log face detection information
-      setLogs((prevLogs) => [
-        ...prevLogs,
-        `Face detected: (${JSON.stringify(prediction)})`
-      ]);
+      setLogs((prevLogs) => [...prevLogs, `Face detected: true`]);
+      console.log(`Face detected: (true)`, JSON.stringify(prediction));
 
       // Bounding box coordinates
       const { xMin, yMin, width, height } = prediction.box;
 
       // Adjust for mirroring
-      const videoScaleX = webcamRef.current.video.style.transform === 'scaleX(-1)' ? -1 : 1;
+      const videoScaleX =
+        webcamRef.current.video.style.transform === "scaleX(-1)" ? -1 : 1;
 
       // Calculate the center of the face
       const centerX = xMin + width / 2;
@@ -143,36 +151,55 @@ const App = () => {
 
       // Define the middle region of the canvas (e.g., the central 50% area)
       const middleRegion = {
-        xMin: canvas.width * 0.25,
-        xMax: canvas.width * 0.75,
+        xMin: canvas.width * 0.45,
+        xMax: canvas.width * 0.55,
         yMin: canvas.height * 0.25,
-        yMax: canvas.height * 0.75,
+        yMax: canvas.height * 0.55,
       };
 
+      const sizeConstraints = {
+        widthMin: canvas.width / 4.5,
+        widthMax: canvas.width / 3,
+        heightMin: canvas.height / 3.5,
+        heightMax: canvas.height / 2.5,
+      };
+      console.log(JSON.stringify(sizeConstraints));
+
       // Check if the face is in the middle region
-      if (centerX * videoScaleX >= middleRegion.xMin &&
-          centerX * videoScaleX <= middleRegion.xMax &&
-          centerY >= middleRegion.yMin &&
-          centerY <= middleRegion.yMax) {
+      if (
+        centerX * videoScaleX >= middleRegion.xMin &&
+        centerX * videoScaleX <= middleRegion.xMax &&
+        centerY >= middleRegion.yMin &&
+        centerY <= middleRegion.yMax &&
+        width <= sizeConstraints.widthMax &&
+        width >= sizeConstraints.widthMin &&
+        height <= sizeConstraints.heightMax &&
+        width >= sizeConstraints.heightMin
+      ) {
         setFaceDetected(true);
 
         if (!frameCaptured) {
           setFrameCaptured(true); // Set the flag to true after detecting the face
           // Capture the image from the webcam after 3 seconds
           setTimeout(() => {
-            capture();
-            setLogs((prevLogs) => [...prevLogs, 'Image captured after 3 seconds.']);
-          }, 1000);
+            //capture();
+            setLogs((prevLogs) => [
+              ...prevLogs,
+              "Image captured after 3 seconds.",
+            ]);
+          }, 3000);
         }
       } else {
         setFaceDetected(false);
       }
     } else {
       setFaceDetected(false);
+      setLogs((prevLogs) => [...prevLogs, `Face detected: false`]);
+      console.log("no face detected");
     }
 
     // Draw the static frame with the updated color
-    drawStaticFrame(ctx, canvas);
+    //drawStaticFrame(ctx, canvas);
 
     // Request the next animation frame for continuous detection
     requestAnimationFrame(() => detectFace(model, video));
@@ -187,7 +214,7 @@ const App = () => {
         const model = await loadModel();
         detectFace(model, video);
       } catch (error) {
-        console.error('Error in main function: ', error);
+        console.error("Error in main function: ", error);
       }
     };
 
@@ -196,30 +223,34 @@ const App = () => {
 
   return (
     <div className="App">
-      {
-        capturedImage ? (
-          <img src={capturedImage} alt="Captured" />
-        ) :  
+      {capturedImage ? (
+        <img src={capturedImage} alt="Captured" />
+      ) : (
         <>
           <Webcam
             ref={webcamRef}
             className="webcam"
             screenshotFormat="image/png"
             videoConstraints={{
-              facingMode: 'user', // Use 'environment' for the back camera
+              facingMode: "user", // Use 'environment' for the back camera
             }}
+            style={{ flex: 1 }}
           />
-          <canvas
-            ref={canvasRef}
-            className="canvas"
-          ></canvas>
-          <div className="log-container">
-            {logs.map((log, index) => (
-              <div key={index}>{log}</div>
-            ))}
-          </div>
+          <Image
+            source={
+              faceDetected
+                ? require("./assets/v2_selfie_frame_green_dashed.png")
+                : require("./assets/v2_selfie_frame_white_dashed.png")
+            }
+            style={{
+              width: "100%",
+              aspectRatio: 1.32,
+            }}
+            resizeMode="center"
+          ></Image>
+          <canvas ref={canvasRef} className="canvas"></canvas>
         </>
-      }
+      )}
     </div>
   );
 };
