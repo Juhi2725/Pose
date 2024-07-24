@@ -325,6 +325,20 @@ const App = () => {
     main();
   }, []);
 
+  const [width, setWidth] = useState(window.innerWidth);
+
+  function handleWindowSizeChange() {
+    setWidth(window.innerWidth);
+  }
+  useEffect(() => {
+    window.addEventListener("resize", handleWindowSizeChange);
+    return () => {
+      window.removeEventListener("resize", handleWindowSizeChange);
+    };
+  }, []);
+
+  const isMobile = width <= 700;
+
   return (
     <div className="App">
       {capturedImage ? (
@@ -348,7 +362,7 @@ const App = () => {
             }
             style={{
               width: "100%",
-              aspectRatio: 1.32,
+              aspectRatio: isMobile ? 0.75 : 1.32,
             }}
             resizeMode="center"
           ></Image>
