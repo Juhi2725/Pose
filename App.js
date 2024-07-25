@@ -52,7 +52,13 @@ const App = () => {
       )}
       {testType === 1 && <BlinkDetector></BlinkDetector>}
 
-      {testType === 2 && <VideoNormalizer></VideoNormalizer>}
+      {testType === 2 && (
+        <>
+          {<VideoNormalizer></VideoNormalizer>}
+
+          {/*<ImageNormalizer></ImageNormalizer>*/}
+        </>
+      )}
     </div>
   );
 };
