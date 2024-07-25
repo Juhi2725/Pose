@@ -19,6 +19,7 @@ import {
   type SimplifiedCaptureVisionSettings,
 } from "dynamsoft-capture-vision-router";
 import { NormalizedImageResultItem } from "dynamsoft-document-normalizer";
+import Webcam from "react-webcam";
 
 function VideoNormalizer() {
   let imageEditorViewContainerRef: MutableRefObject<HTMLDivElement | null> =
@@ -50,6 +51,7 @@ function VideoNormalizer() {
     const init = async () => {
       try {
         view.current = await CameraView.createInstance();
+
         dce.current = await (cameraEnhancer.current =
           CameraEnhancer.createInstance(view.current));
         imageEditorView.current = await ImageEditorView.createInstance(
@@ -62,8 +64,11 @@ function VideoNormalizer() {
          * Creates a CaptureVisionRouter instance and configure the task to detect document boundaries.
          * Also, make sure the original image is returned after it has been processed.
          */
+        //I believe the error occurrs here - Cannot read properties of undefined (reading 'apply')
+
         normalizer.current = await (router.current =
           CaptureVisionRouter.createInstance());
+
         normalizer.current.setInput(dce.current);
         /**
          * Sets the result types to be returned.
@@ -110,7 +115,7 @@ function VideoNormalizer() {
         setShowLoading(false);
       } catch (ex: any) {
         let errMsg = ex.message || ex;
-        //console.error(errMsg);
+        console.error(errMsg);
         alert(errMsg);
       }
     };
