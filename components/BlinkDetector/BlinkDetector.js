@@ -7,14 +7,11 @@ import Webcam from "react-webcam";
 import * as tf from "@tensorflow/tfjs";
 import * as faceDetection from "@tensorflow-models/face-detection";
 import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
-import "./App.css";
+import "../../App.css";
 import { Image, Text, TouchableOpacity, View } from "react-native";
-import { filterByType } from "./helper";
-import VideoNormalizer from "./components/VideoNormalizer/VideoNormalizer";
-import ImageNormalizer from "./components/ImageNormalizer/ImageNormazlier";
-import BlinkDetector from "./components/BlinkDetector/BlinkDetector";
+import { filterByType } from "../../helper";
 
-const App = () => {
+const BlinkDetector = () => {
   const [logs, setLogs] = useState([]);
   const [capturedImage, setCapturedImage] = useState(null);
   const [frameCaptured, setFrameCaptured] = useState(false); // Flag to ensure only one frame capture
@@ -24,10 +21,6 @@ const App = () => {
   const [ctxTest, setCtxTest] = useState(null);
   const [userInFrame, setUserInFrame] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
-
-  //temporary way to access different test cases
-  //0 = menu - 1 = face recognition 2 = document
-  const [testType, setTestType] = useState(0);
 
   const setupCamera = async () => {
     try {
@@ -317,6 +310,22 @@ const App = () => {
     requestAnimationFrame(() => detectFace(model, video));
   };
 
+  useEffect(() => {
+    const main = async () => {
+      try {
+        const video = await setupCamera();
+        video.play();
+
+        const model = await loadModel();
+        detectFace(model, video);
+      } catch (error) {
+        console.error("Error in main function: ", error);
+      }
+    };
+
+    main();
+  }, []);
+
   const [width, setWidth] = useState(window.innerWidth);
 
   function handleWindowSizeChange() {
@@ -332,50 +341,52 @@ const App = () => {
   const isMobile = width <= 700;
 
   return (
-    <div className="App">
-      {testType === 0 && (
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <Text style={{ color: "black", flex: 1, textAlign: "center" }}>
-            Select Test Type
-          </Text>
-          <TouchableOpacity
-            style={{
-              width: 300,
-              height: 40,
-              backgroundColor: "grey",
-              borderRadius: 8,
-              marginTop: 16,
-              justifyContent: "center",
+    <>
+      {capturedImage ? (
+        <img src={capturedImage} alt="Captured" />
+      ) : (
+        <>
+          <Webcam
+            ref={webcamRef}
+            className="webcam"
+            screenshotFormat="image/png"
+            videoConstraints={{
+              facingMode: "user", // Use 'environment' for the back camera
             }}
-            onPress={() => setTestType(1)}
-          >
-            <Text style={{ color: "white", textAlign: "center" }}>
-              Face recognition
-            </Text>
-          </TouchableOpacity>
+            style={{ flex: 1 }}
+          />
+          <Image
+            source={
+              faceDetected
+                ? require("../../assets/v2_selfie_frame_green_dashed.png")
+                : require("../../assets/v2_selfie_frame_white_dashed.png")
+            }
+            style={{
+              width: "100%",
+              aspectRatio: isMobile ? 0.75 : 1.32,
+            }}
+            resizeMode="center"
+          ></Image>
 
-          <TouchableOpacity
-            style={{
-              width: 300,
-              height: 40,
-              backgroundColor: "grey",
-              borderRadius: 8,
-              marginTop: 16,
-              justifyContent: "center",
-            }}
-            onPress={() => setTestType(2)}
-          >
-            <Text style={{ color: "white", textAlign: "center" }}>
-              Document Scan
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <canvas ref={canvasRef} className="canvas"></canvas>
+          {timeLeft != null && (
+            <View style={{ flex: 1, position: "absolute" }}>
+              <Text
+                style={{
+                  fontSize: 64,
+                  width: "100%",
+                  textAlign: "center",
+                  color: "white",
+                }}
+              >
+                {timeLeft}
+              </Text>
+            </View>
+          )}
+        </>
       )}
-      {testType === 1 && <BlinkDetector></BlinkDetector>}
-
-      {testType === 2 && <VideoNormalizer></VideoNormalizer>}
-    </div>
+    </>
   );
 };
 
-export default App;
+export default BlinkDetector;
