@@ -8,7 +8,7 @@ import * as tf from "@tensorflow/tfjs";
 import * as faceDetection from "@tensorflow-models/face-detection";
 import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import "./App.css";
-import { Image, Text, View } from "react-native";
+import { Button, Image, Text, TouchableOpacity, View } from "react-native";
 import { filterByType } from "./helper";
 
 const App = () => {
@@ -20,8 +20,11 @@ const App = () => {
   const canvasRef = useRef(null);
   const [ctxTest, setCtxTest] = useState(null);
   const [userInFrame, setUserInFrame] = useState(false);
-
   const [timeLeft, setTimeLeft] = useState(null);
+
+  //temporary
+  //0 = menu - 1 = face recognition 2 = document
+  const [testType, setTestType] = useState(0);
 
   const setupCamera = async () => {
     try {
@@ -216,8 +219,10 @@ const App = () => {
   }, [frameCaptured]);
 
   useEffect(() => {
-    console.log("should capture");
-    if (timeLeft > 0) {
+    console.log("time left", timeLeft);
+    if (timeLeft === null) {
+      //do nothing (temp fix)
+    } else if (timeLeft > 0) {
       setTimeout(() => {
         setTimeLeft(timeLeft - 1);
       }, 1000);
@@ -310,20 +315,22 @@ const App = () => {
   };
 
   useEffect(() => {
-    const main = async () => {
-      try {
-        const video = await setupCamera();
-        video.play();
+    if (testType === 1) {
+      const main = async () => {
+        try {
+          const video = await setupCamera();
+          video.play();
 
-        const model = await loadModel();
-        detectFace(model, video);
-      } catch (error) {
-        console.error("Error in main function: ", error);
-      }
-    };
+          const model = await loadModel();
+          detectFace(model, video);
+        } catch (error) {
+          console.error("Error in main function: ", error);
+        }
+      };
 
-    main();
-  }, []);
+      main();
+    }
+  }, [testType]);
 
   const [width, setWidth] = useState(window.innerWidth);
 
@@ -341,46 +348,87 @@ const App = () => {
 
   return (
     <div className="App">
-      {capturedImage ? (
-        <img src={capturedImage} alt="Captured" />
-      ) : (
-        <>
-          <Webcam
-            ref={webcamRef}
-            className="webcam"
-            screenshotFormat="image/png"
-            videoConstraints={{
-              facingMode: "user", // Use 'environment' for the back camera
-            }}
-            style={{ flex: 1 }}
-          />
-          <Image
-            source={
-              faceDetected
-                ? require("./assets/v2_selfie_frame_green_dashed.png")
-                : require("./assets/v2_selfie_frame_white_dashed.png")
-            }
+      {testType === 0 && (
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ color: "black", flex: 1, textAlign: "center" }}>
+            Select Test Type
+          </Text>
+          <TouchableOpacity
             style={{
-              width: "100%",
-              aspectRatio: isMobile ? 0.75 : 1.32,
+              width: 300,
+              height: 40,
+              backgroundColor: "grey",
+              borderRadius: 8,
+              marginTop: 16,
+              justifyContent: "center",
             }}
-            resizeMode="center"
-          ></Image>
+            onPress={() => setTestType(1)}
+          >
+            <Text style={{ color: "white", textAlign: "center" }}>
+              Face recognition
+            </Text>
+          </TouchableOpacity>
 
-          <canvas ref={canvasRef} className="canvas"></canvas>
-          {timeLeft != null && (
-            <View style={{ flex: 1, position: "absolute" }}>
-              <Text
-                style={{
-                  fontSize: 64,
-                  width: "100%",
-                  textAlign: "center",
-                  color: "white",
+          <TouchableOpacity
+            style={{
+              width: 300,
+              height: 40,
+              backgroundColor: "grey",
+              borderRadius: 8,
+              marginTop: 16,
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ color: "white", textAlign: "center" }}>
+              Document Scan
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {testType === 1 && (
+        <>
+          {capturedImage ? (
+            <img src={capturedImage} alt="Captured" />
+          ) : (
+            <>
+              <Webcam
+                ref={webcamRef}
+                className="webcam"
+                screenshotFormat="image/png"
+                videoConstraints={{
+                  facingMode: "user", // Use 'environment' for the back camera
                 }}
-              >
-                {timeLeft}
-              </Text>
-            </View>
+                style={{ flex: 1 }}
+              />
+              <Image
+                source={
+                  faceDetected
+                    ? require("./assets/v2_selfie_frame_green_dashed.png")
+                    : require("./assets/v2_selfie_frame_white_dashed.png")
+                }
+                style={{
+                  width: "100%",
+                  aspectRatio: isMobile ? 0.75 : 1.32,
+                }}
+                resizeMode="center"
+              ></Image>
+
+              <canvas ref={canvasRef} className="canvas"></canvas>
+              {timeLeft != null && (
+                <View style={{ flex: 1, position: "absolute" }}>
+                  <Text
+                    style={{
+                      fontSize: 64,
+                      width: "100%",
+                      textAlign: "center",
+                      color: "white",
+                    }}
+                  >
+                    {timeLeft}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </>
       )}
